@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<genmodel:GenModel xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore"
+    xmlns:genmodel="http://www.eclipse.org/emf/2002/GenModel" modelDirectory="/tools.vitruv.change.maturity.model/target/generated-sources/ecore" modelPluginID="tools.vitruv.change.maturity.model" modelName="Maturity"
+    rootExtendsClass="org.eclipse.emf.ecore.impl.MinimalEObjectImpl$Container" importerID="org.eclipse.emf.importer.ecore"
+    complianceLevel="21.0" copyrightFields="false" operationReflection="true" importOrganizing="true">
+  <foreignModel>maturity.ecore</foreignModel>
+  <genPackages prefix="Maturity" disposableProviderFactory="true" ecorePackage="maturity.ecore#/">
+    <genEnums typeSafeEnumCompatible="false" ecoreEnum="maturity.ecore#//MaturityLevelEnum">
+      <genEnumLiterals ecoreEnumLiteral="maturity.ecore#//MaturityLevelEnum/DRAFT"/>
+      <genEnumLiterals ecoreEnumLiteral="maturity.ecore#//MaturityLevelEnum/REVIEWED"/>
+      <genEnumLiterals ecoreEnumLiteral="maturity.ecore#//MaturityLevelEnum/FINAL"/>
+    </genEnums>
+    <genClasses ecoreClass="maturity.ecore#//MaturityChange">
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute maturity.ecore#//MaturityChange/date"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute maturity.ecore#//MaturityChange/oldLevel"/>
+      <genFeatures createChild="false" ecoreFeature="ecore:EAttribute maturity.ecore#//MaturityChange/newLevel"/>
+    </genClasses>
+    <genClasses ecoreClass="maturity.ecore#//MaturityState">
+      <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference maturity.ecore#//MaturityState/history"/>
+      <genFeatures notify="false" createChild="false" propertySortChoices="true" ecoreFeature="ecore:EReference maturity.ecore#//MaturityState/target"/>
+    </genClasses>
+  </genPackages>
+</genmodel:GenModel>

@@ -43,6 +43,8 @@
     <module>correspondence</module>
     <module>interaction</module>
     <module>interaction.model</module>
+    <module>maturity</module>
+    <module>maturity.model</module>
     <module>propagation</module>
     <module>testutils</module>
     <module>utils</module>
