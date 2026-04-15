@@ -13,9 +13,11 @@ import tools.vitruv.change.composite.description.VitruviusChange;
 import tools.vitruv.change.composite.propagation.ChangePropagationListener;
 import tools.vitruv.change.composite.propagation.ChangeableModelRepository;
 import tools.vitruv.change.interaction.InternalUserInteractor;
+import tools.vitruv.change.propagation.AlwaysPropagateTriggerStrategy;
 import tools.vitruv.change.propagation.ChangePropagationObservableRegistry;
 import tools.vitruv.change.propagation.ChangePropagationObserver;
 import tools.vitruv.change.propagation.ChangePropagationSpecificationProvider;
+import tools.vitruv.change.propagation.ChangePropagationTriggerStrategy;
 import tools.vitruv.change.propagation.PersistableChangeRecordingModelRepository;
 
 /**
@@ -32,6 +34,8 @@ public class DefaultChangeableModelRepository implements ChangeableModelReposito
   private final Set<ChangePropagationObserver> changePropagationObservers = new HashSet<>();
   private final PersistableChangeRecordingModelRepository modelRepository;
   private final ChangePropagator changePropagator;
+  private final InternalUserInteractor userInteractor;
+  private final ChangePropagationTriggerStrategy triggerStrategy;
 
   /**
    * Creates a new instance of the {@link DefaultChangeableModelRepository}.
@@ -45,7 +49,38 @@ public class DefaultChangeableModelRepository implements ChangeableModelReposito
       PersistableChangeRecordingModelRepository modelRepository,
       ChangePropagationSpecificationProvider changePropagationSpecificationProvider,
       InternalUserInteractor userInteractor) {
+    this(
+        modelRepository,
+        changePropagationSpecificationProvider,
+        userInteractor,
+        new AlwaysPropagateTriggerStrategy());
+  }
+
+  /**
+   * Creates a new instance of the {@link DefaultChangeableModelRepository} with a trigger
+   * strategy determining when propagation starts.
+   *
+   * @param modelRepository the {@link PersistableChangeRecordingModelRepository} to use for
+   * @param changePropagationSpecificationProvider the {@link
+   *     ChangePropagationSpecificationProvider}
+   * @param userInteractor the {@link InternalUserInteractor} to use for interactions during change
+   * @param triggerStrategy strategy deciding whether to run propagation for an incoming change
+   */
+  public DefaultChangeableModelRepository(
+      PersistableChangeRecordingModelRepository modelRepository,
+      ChangePropagationSpecificationProvider changePropagationSpecificationProvider,
+      InternalUserInteractor userInteractor,
+      ChangePropagationTriggerStrategy triggerStrategy) {
+    checkArgument(modelRepository != null, "model repository must not be null");
+    checkArgument(
+      changePropagationSpecificationProvider != null,
+      "change propagation specification provider must not be null");
+    checkArgument(userInteractor != null, "user interactor must not be null");
+    checkArgument(triggerStrategy != null, "trigger strategy must not be null");
+
     this.modelRepository = modelRepository;
+    this.userInteractor = userInteractor;
+    this.triggerStrategy = triggerStrategy;
     this.changePropagator =
         new ChangePropagator(
             modelRepository, changePropagationSpecificationProvider, userInteractor);
@@ -59,6 +94,10 @@ public class DefaultChangeableModelRepository implements ChangeableModelReposito
         "change to propagate must contain concrete changes:%s%s",
         System.lineSeparator(),
         change);
+    if (!triggerStrategy.shouldPropagate(change, userInteractor)) {
+      LOGGER.info("Skipping change propagation due to trigger strategy decision");
+      return List.of();
+    }
 
     // Set up logging/reporting
     LOGGER.info("Start change propagation");
