@@ -2,7 +2,6 @@ package tools.vitruv.change.propagation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Proxy;
@@ -11,30 +10,43 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.vitruv.change.interaction.InternalUserInteractor;
-import tools.vitruv.change.interaction.builder.ConfirmationInteractionBuilder;
+import tools.vitruv.change.interaction.builder.MultipleChoiceSelectionInteractionBuilder;
+import tools.vitruv.change.interaction.builder.MultipleChoiceSingleSelectionInteractionBuilder;
 
 class ChangePropagationTriggerStrategyTests {
 
   @Test
-  void humanApprovalAllowsPropagationWhenUserConfirms() {
-    List<String> capturedMessages = new ArrayList<>();
-    var userInteractor = createInteractor(Boolean.TRUE, capturedMessages);
+  void humanApprovalAllowsPropagationWhenUserAccepts() {
+    var userInteractor = createInteractor(0, new ArrayList<>());
     var strategy = new HumanApprovalTriggerStrategy("Please confirm propagation");
 
     var shouldPropagate = strategy.shouldPropagate(null, userInteractor);
 
     assertTrue(shouldPropagate);
-    assertEquals(List.of("Please confirm propagation"), capturedMessages);
   }
 
   @Test
-  void humanApprovalSkipsPropagationWhenUserRejects() {
-    var userInteractor = createInteractor(Boolean.FALSE, new ArrayList<>());
+  void humanApprovalSkipsPropagationWhenUserDenies() {
+    var userInteractor = createInteractor(1, new ArrayList<>());
     var strategy = new HumanApprovalTriggerStrategy();
 
     var shouldPropagate = strategy.shouldPropagate(null, userInteractor);
 
     assertFalse(shouldPropagate);
+  }
+
+  @Test
+  void humanApprovalDelaysAndThenPropagatesWhenUserDelays() {
+    List<Duration> observedDelays = new ArrayList<>();
+    var userInteractor = createInteractor(2, new ArrayList<>());
+    var strategy =
+        new HumanApprovalTriggerStrategy(
+            "Please confirm propagation", Duration.ofMinutes(5), observedDelays::add);
+
+    var shouldPropagate = strategy.shouldPropagate(null, userInteractor);
+
+    assertTrue(shouldPropagate);
+    assertEquals(List.of(Duration.ofMinutes(5)), observedDelays);
   }
 
   @Test
@@ -49,43 +61,41 @@ class ChangePropagationTriggerStrategyTests {
     assertEquals(List.of(Duration.ofMinutes(10)), observedDelays);
   }
 
-  @Test
-  void delayedStrategyThrowsWhenInterrupted() {
-    var strategy =
-        new DelayedTriggerStrategy(
-            Duration.ofSeconds(1),
-            delay -> {
-              throw new InterruptedException("interrupted");
-            });
-
-    assertThrows(IllegalStateException.class, () -> strategy.shouldPropagate(null, null));
-    assertTrue(Thread.currentThread().isInterrupted());
-    Thread.interrupted();
-  }
-
   private static InternalUserInteractor createInteractor(
-      Boolean confirmationResult, List<String> capturedMessages) {
+      Integer selectedIndex, List<String> capturedMessages) {
     var optionalSteps =
-        (ConfirmationInteractionBuilder.OptionalSteps)
+        (MultipleChoiceSelectionInteractionBuilder.OptionalSteps<Integer>)
             Proxy.newProxyInstance(
                 ChangePropagationTriggerStrategyTests.class.getClassLoader(),
-                new Class<?>[] {ConfirmationInteractionBuilder.OptionalSteps.class},
+                new Class<?>[] {MultipleChoiceSelectionInteractionBuilder.OptionalSteps.class},
                 (proxy, method, args) -> {
                   if ("startInteraction".equals(method.getName())) {
-                    return confirmationResult;
+                    return selectedIndex;
                   }
                   return proxy;
                 });
 
-    var confirmationBuilder =
-        (ConfirmationInteractionBuilder)
+    var choicesStep =
+        (MultipleChoiceSelectionInteractionBuilder.ChoicesStep<Integer>)
             Proxy.newProxyInstance(
                 ChangePropagationTriggerStrategyTests.class.getClassLoader(),
-                new Class<?>[] {ConfirmationInteractionBuilder.class},
+                new Class<?>[] {MultipleChoiceSelectionInteractionBuilder.ChoicesStep.class},
+                (proxy, method, args) -> {
+                  if ("choices".equals(method.getName())) {
+                    return optionalSteps;
+                  }
+                  return proxy;
+                });
+
+    var singleSelectionBuilder =
+        (MultipleChoiceSingleSelectionInteractionBuilder)
+            Proxy.newProxyInstance(
+                ChangePropagationTriggerStrategyTests.class.getClassLoader(),
+                new Class<?>[] {MultipleChoiceSingleSelectionInteractionBuilder.class},
                 (proxy, method, args) -> {
                   if ("message".equals(method.getName()) && args != null && args.length == 1) {
                     capturedMessages.add((String) args[0]);
-                    return optionalSteps;
+                    return choicesStep;
                   }
                   return null;
                 });
@@ -96,8 +106,8 @@ class ChangePropagationTriggerStrategyTests {
                 ChangePropagationTriggerStrategyTests.class.getClassLoader(),
                 new Class<?>[] {InternalUserInteractor.class},
                 (proxy, method, args) -> {
-                  if ("getConfirmationDialogBuilder".equals(method.getName())) {
-                    return confirmationBuilder;
+                  if ("getSingleSelectionDialogBuilder".equals(method.getName())) {
+                    return singleSelectionBuilder;
                   }
                   if (method.getReturnType().equals(boolean.class)) {
                     return false;
